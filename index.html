@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Flashcards</title>
+    
+    <!-- PWA Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="暗記カード">
+    
+    <!-- Tailwind CSS & FontAwesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            light: '#deff9a',
+                            DEFAULT: '#b5e655',
+                            dark: '#1e293b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* 3Dカードの反転用スタイル */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        /* スムーズなスクロール */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-brand selection:text-slate-900 no-scrollbar overflow-x-hidden">
+
+    <!-- HEADER -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-slate-950 font-bold">
+                    <i class="fa-solid fa-brain text-sm"></i>
+                </div>
+                <h1 class="text-lg font-bold tracking-tight">Smart <span class="text-brand">Cards</span></h1>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- カテゴリ選択とモード選択を並べる -->
+                <div class="flex gap-2">
+<select id="categorySelect" onchange="changeCategory(this.value)" class="flex-1 bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-2 focus:outline-none focus:border-brand">
+</select>
+                    <select id="modeSelect" onchange="changeMode(this.value)" class="flex-1 bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-2 focus:outline-none focus:border-brand">
+                        <option value="normal">📋 登録順</option>
+                        <option value="weak">🔺 苦手優先</option>
+                        <option value="forgotten">⏳ 忘却順</option>
+                        <option value="random">🔀 ランダム</option>
+                    </select>
+                </div>
+
+                <!-- 設定ボタン -->
+                <button onclick="toggleSettingsModal(true)" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand transition-colors">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow flex flex-col items-center justify-center px-4 py-6 max-w-md mx-auto w-full gap-6">
+        
+        <!-- プログレス表示 -->
+        <div class="w-full flex items-center justify-between text-xs text-slate-400 px-1">
+            <span id="progressText">カードを読み込み中...</span>
+            <div class="flex gap-2 items-center">
+                <span id="syncStatusBadge" class="text-blue-400 text-[11px] animate-pulse hidden">
+                    <i class="fa-solid fa-arrows-rotate animate-spin mr-1"></i>同期中
+                </span>
+                <span id="modeBadge" class="bg-brand/20 text-brand text-[11px] px-2.5 py-0.5 rounded-full">
+                    登録順
+                </span>
+            </div>
+        </div>
+
+        <!-- 3D フラッシュカード -->
+        <div class="w-full perspective-1000 h-[400px]" onclick="flipCard()">
+            <div id="flashcard" class="relative w-full h-full transition-transform duration-500 transform-style-3d cursor-pointer">
+                
+                <!-- 表面（問題） -->
+                <div class="absolute w-full h-full backface-hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+                    <div class="text-xs text-slate-500 font-bold tracking-widest uppercase">Question</div>
+                    <div class="flex-grow flex items-center justify-center">
+                        <p id="frontText" class="text-xl md:text-2xl text-center font-bold leading-relaxed text-slate-100">
+                            問題がここに表示されます
+                        </p>
+                    </div>
+                    <div class="text-center text-xs text-slate-500">
+                        <i class="fa-solid fa-rotate mr-1"></i> タップして解答を表示
+                    </div>
+                </div>
+                
+                <!-- 裏面（解答・解説） -->
+                <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 border-2 border-brand/20 rounded-2xl p-6 flex flex-col justify-between shadow-xl overflow-y-auto no-scrollbar">
+                    <div class="text-xs text-brand font-bold tracking-widest uppercase">Answer & Info</div>
+                    
+                    <div class="flex-grow flex flex-col items-center justify-center my-4 gap-4 w-full">
+                        <p id="backText" class="text-xl md:text-2xl text-center font-bold text-brand leading-relaxed">
+                            解答がここに表示されます
+                        </p>
+                        <p id="explanationText" class="text-sm text-slate-400 text-center max-w-sm">
+                            解説がここに表示されます
+                        </p>
+                        <div id="imageContainer" class="hidden w-full max-h-[150px] overflow-hidden rounded-lg border border-slate-800">
+                            <img id="cardImage" src="" alt="補足画像" class="w-full h-full object-contain" onerror="this.style.display='none'">
+                        </div>
+                    </div>
+
+                    <div class="text-center text-xs text-slate-500">
+                        <i class="fa-solid fa-rotate mr-1"></i> タップして問題に戻る
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 学習統計ミニログ -->
+        <div id="statsMini" class="w-full bg-slate-900/50 border border-slate-900 rounded-xl p-3 flex justify-around text-center text-xs">
+            <div>
+                <span class="text-slate-500 block mb-0.5">正解数</span>
+                <span id="statCorrectCount" class="font-bold text-brand">-</span>
+            </div>
+            <div class="border-l border-slate-800"></div>
+            <div>
+                <span class="text-slate-500 block mb-0.5">難易度</span>
+                <span id="statLevel" class="font-bold text-slate-300">-</span>
+            </div>
+            <div class="border-l border-slate-800"></div>
+            <div>
+                <span class="text-slate-500 block mb-0.5">最終学習</span>
+                <span id="statLastDate" class="font-bold text-slate-300">-</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER ACTION BUTTONS -->
+    <footer class="bg-slate-900/50 border-t border-slate-800/80 px-4 py-6 z-10">
+        <div class="max-w-md mx-auto flex gap-4">
+            <!-- 不正解ボタン -->
+            <button onclick="handleResponse(false)" class="flex-1 bg-red-950/40 hover:bg-red-950/60 active:scale-95 text-red-400 border border-red-900/50 py-4 px-6 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-950/20">
+                <i class="fa-solid fa-xmark text-lg"></i>
+                <span>違った</span>
+            </button>
+            
+            <!-- 正解ボタン -->
+            <button onclick="handleResponse(true)" class="flex-1 bg-brand hover:bg-brand-light active:scale-95 text-slate-950 py-4 px-6 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/10">
+                <i class="fa-solid fa-check text-lg"></i>
+                <span>覚えた！</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-5">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-brand"></i> API連携設定
+                </h3>
+                <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+
+            
+            
+            <p class="text-xs text-slate-400 leading-relaxed">
+                GitHubにソースコードを置いてもURLが漏れないよう、あなたのiPhone本体のみにAPIの接続先を記憶させます。
+            </p>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-xs font-bold text-slate-300">GASのWebアプリURL</label>
+                <input type="password" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="bg-slate-950 text-sm text-slate-200 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-brand w-full">
+                <div class="flex items-center gap-1.5 mt-1">
+                    <input type="checkbox" id="showUrlCheckbox" onchange="toggleUrlVisibility()" class="rounded bg-slate-950 border-slate-800 text-brand focus:ring-0">
+                    <label for="showUrlCheckbox" class="text-[11px] text-slate-400 cursor-pointer">URLを表示する</label>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-2">
+                <button onclick="toggleSettingsModal(false)" class="flex-1 bg-slate-800 text-slate-300 text-sm font-semibold py-3 rounded-xl hover:bg-slate-700 transition-colors">
+                    キャンセル
+                </button>
+                <button onclick="saveSettings()" class="flex-1 bg-brand text-slate-950 text-sm font-bold py-3 rounded-xl hover:bg-brand-light transition-colors">
+                    設定を保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+let cards = [];
+let currentIndex = 0;
+let isFlipped = false;
+let currentCategory = ''; // 最初は空にする（自動ロードするため）
+let currentMode = 'normal'; // 初期出題モードを「登録順」に設定
+let isSubmitting = false;
+
+        // アプリ起動時の処理
+        window.addEventListener('DOMContentLoaded', () => {
+            // ローカルストレージから設定を呼び出す
+            const savedUrl = localStorage.getItem('flashcard_api_url');
+            if (savedUrl) {
+                document.getElementById('apiUrlInput').value = savedUrl;
+    loadSheetListAndCards(); // ★動的ロード用の関数を呼ぶ
+            } else {
+                // 設定がない場合は設定モーダルを強制表示
+                toggleSettingsModal(true);
+                document.getElementById('progressText').innerText = "最初にAPI設定を行ってください。";
+            }
+            
+            // カテゴリの初期選択状態をセット
+            const savedCat = localStorage.getItem('flashcard_category');
+            if (savedCat) {
+                currentCategory = savedCat;
+                document.getElementById('categorySelect').value = savedCat;
+            }
+
+            // モードの初期選択状態をセット
+            const savedMode = localStorage.getItem('flashcard_mode');
+            if (savedMode) {
+                currentMode = savedMode;
+                document.getElementById('modeSelect').value = savedMode;
+            }
+        });
+
+        // モーダルの開閉
+        function toggleSettingsModal(show) {
+            const modal = document.getElementById('settingsModal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // パスワード表示切り替え
+        function toggleUrlVisibility() {
+            const input = document.getElementById('apiUrlInput');
+            const checkbox = document.getElementById('showUrlCheckbox');
+            input.type = checkbox.checked ? 'text' : 'password';
+        }
+
+        // 設定の保存
+        function saveSettings() {
+            const urlInput = document.getElementById('apiUrlInput').value.trim();
+            if (!urlInput.startsWith('https://script.google.com/')) {
+                alert('有効なGoogle Apps ScriptのURLを入力してください。');
+                return;
+            }
+            localStorage.setItem('flashcard_api_url', urlInput);
+            toggleSettingsModal(false);
+            loadSheetListAndCards(); // ★動的ロード用の関数を呼ぶ
+        }
+
+        // カテゴリの変更
+        function changeCategory(value) {
+            currentCategory = value;
+            localStorage.setItem('flashcard_category', value);
+            loadCards();
+        }
+
+// スプレッドシートからタブ（シート）一覧を動的に取得して組み立てる関数
+        async function loadSheetListAndCards() {
+            const apiUrl = localStorage.getItem('flashcard_api_url');
+            if (!apiUrl) return;
+
+            document.getElementById('progressText').innerText = "シート構成を確認中...";
+
+            try {
+                // 特別クエリ「__list__」を使ってGASからシートのタブ名リストを取得
+                const response = await fetch(`${apiUrl}?sheet=__list__`);
+                const sheetNames = await response.json();
+
+                if (sheetNames.error || !Array.isArray(sheetNames)) {
+                    document.getElementById('progressText').innerText = "シート構成の取得に失敗しました。";
+                    return;
+                }
+
+                // カテゴリ選択メニュー（categorySelect）の中身をリセットして動的に組み立て
+                const selectEl = document.getElementById('categorySelect');
+                selectEl.innerHTML = '';
+
+                sheetNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.innerText = name; // 絵文字や日本語名もそのままドロップダウンメニューに表示
+                    selectEl.appendChild(option);
+                });
+
+                // 前回開いていたカテゴリ、または1番目のシートを選択
+                const savedCat = localStorage.getItem('flashcard_category');
+                if (savedCat && sheetNames.includes(savedCat)) {
+                    currentCategory = savedCat;
+                } else {
+                    currentCategory = sheetNames[0];
+                    localStorage.setItem('flashcard_category', currentCategory);
+                }
+                selectEl.value = currentCategory;
+
+                // 準備ができたら、そのシートのカードデータをロードする
+                loadCards();
+
+            } catch (error) {
+                document.getElementById('progressText').innerText = "スプレッドシート接続エラー";
+                console.error(error);
+            }
+        }
+
+
+        // GASから暗記項目を取得
+        async function loadCards() {
+            const apiUrl = localStorage.getItem('flashcard_api_url');
+            if (!apiUrl) return;
+
+            document.getElementById('progressText').innerText = "スプレッドシートから同期中...";
+            resetCardState();
+
+            try {
+                const response = await fetch(`${apiUrl}?sheet=${encodeURIComponent(currentCategory)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('progressText').innerText = "エラー: " + data.error;
+                    return;
+                }
+
+                if (data.length === 0) {
+                    document.getElementById('progressText').innerText = "データが空です。シートを確認してください。";
+                    return;
+                }
+
+                cards = data; // データをそのまま代入
+                applyModeAndSort(); // ★ソートと表示は専用関数に任せる
+
+            } catch (error) {
+                document.getElementById('progressText').innerText = "同期に失敗しました。URLを確認してください。";
+                console.error(error);
+            }
+        }
+
+        // 1. メニューでモードが変更された時に呼び出される関数
+        function changeMode(val) {
+            currentMode = val;
+            localStorage.setItem('flashcard_mode', val); // 選択したモードをスマホに記憶
+            applyModeAndSort(); // 並び替えて再表示
+        }
+
+        // 2. 選択されたモード（currentMode）に基づいてカードを並び替える関数
+        function applyModeAndSort() {
+            if (!cards || cards.length === 0) return;
+
+            // モード別のラベル一覧
+            const modeLabels = {
+                'weak': '苦手優先',
+                'normal': '登録順',
+                'random': 'ランダム',
+                'forgotten': '忘却順'
+            };
+
+            // ヘッダーのモード表示バッジを更新
+            const modeBadge = document.getElementById('modeBadge');
+            if (modeBadge) {
+                modeBadge.innerText = modeLabels[currentMode];
+            }
+
+            // モードごとの並び替えロジック
+            if (currentMode === 'weak') {
+                // 【苦手優先】 Correct_Count（正解回数）が少ない順
+                cards.sort((a, b) => (Number(a.Correct_Count) || 0) - (Number(b.Correct_Count) || 0));
+            } 
+            else if (currentMode === 'normal') {
+                // 【登録順】 スプレッドシートのIDの降順（新しく登録したものから出現）
+                cards.sort((a, b) => (Number(b.ID) || 0) - (Number(a.ID) || 0));
+            } 
+            else if (currentMode === 'random') {
+                // 【ランダム】 配列をシャッフル（Fisher-Yatesアルゴリズム）
+                for (let i = cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [cards[i], cards[j]] = [cards[j], cards[i]];
+                }
+            } 
+            else if (currentMode === 'forgotten') {
+                // 【忘却順】 最終学習日（Last_Date）が古い順（未回答は最優先で先頭へ）
+                cards.sort((a, b) => {
+                    if (!a.Last_Date) return -1;
+                    if (!b.Last_Date) return 1;
+                    return new Date(a.Last_Date) - new Date(b.Last_Date);
+                });
+            }
+
+            // 進捗を1問目にリセットし、カードを表面に戻して画面を描画
+            currentIndex = 0;
+            resetCardState(); 
+            displayCard();    
+        }
+
+        // カード情報の表示
+        function displayCard() {
+            if (cards.length === 0) return;
+            const card = cards[currentIndex];
+
+            // 表面表示
+            document.getElementById('frontText').innerText = card.Problem || card.問題 || '（問題が未入力です）';
+            
+            // 裏面表示
+            document.getElementById('backText').innerText = card.Answer || card.解答 || '（解答が未入力です）';
+            document.getElementById('explanationText').innerText = card.Explanation || card.解説 || '';
+            
+            // 画像表示制御
+            const imgUrl = card.URL || card.画像URL;
+            const imgContainer = document.getElementById('imageContainer');
+            const cardImg = document.getElementById('cardImage');
+            if (imgUrl && imgUrl.startsWith('http')) {
+                cardImg.src = imgUrl;
+                imgContainer.classList.remove('hidden');
+            } else {
+                imgContainer.classList.add('hidden');
+            }
+
+            // 学習ログミニ統計の更新
+            document.getElementById('statCorrectCount').innerText = `${card.Correct_Count || 0} 回`;
+            document.getElementById('statLevel').innerText = card.Level || card.レベル || '未設定';
+            document.getElementById('statLastDate').innerText = card.Last_Date ? formatDateString(card.Last_Date) : '未学習';
+
+            // 進捗状況テキスト
+            document.getElementById('progressText').innerText = `進捗: ${currentIndex + 1} / ${cards.length} 問目`;
+        }
+
+        // カードをめくる
+        function flipCard() {
+            const cardEl = document.getElementById('flashcard');
+            isFlipped = !isFlipped;
+            if (isFlipped) {
+                cardEl.classList.add('rotate-y-180');
+            } else {
+                cardEl.classList.remove('rotate-y-180');
+            }
+        }
+
+        function resetCardState() {
+            isFlipped = false;
+            document.getElementById('flashcard').classList.remove('rotate-y-180');
+        }
+
+        // 一巡完了モーダルの表示・非表示コントロール
+function toggleRoundCompleteModal(show) {
+    const modal = document.getElementById('roundCompleteModal');
+    if (modal) {
+        if (show) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+}
+
+// 1周完了時の集計データの表示
+function showRoundComplete() {
+    document.getElementById('completedTotalCount').innerText = `${cards.length} 枚`;
+
+    const modeLabels = {
+        'weak': '🔺 苦手優先',
+        'normal': '📋 登録順',
+        'random': '🔀 ランダム',
+        'forgotten': '⏳ 忘却順'
+    };
+    document.getElementById('completedModeName').innerText = modeLabels[currentMode];
+
+    toggleRoundCompleteModal(true);
+}
+
+// もう一周するボタンが押されたときのリスタート処理
+function restartRound() {
+    toggleRoundCompleteModal(false);
+    // ランダムモードの場合は再度シャッフルした方が親切なのでソートを掛け直す
+    if (currentMode === 'random') {
+        applyModeAndSort();
+    } else {
+        currentIndex = 0;
+        resetCardState();
+        displayCard();
+    }
+}
+        
+        // 日付の簡易フォーマット変換
+        function formatDateString(dateStr) {
+            try {
+                const d = new Date(dateStr);
+                return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            } catch(e) {
+                return dateStr;
+            }
+        }
+
+        // 正解・不正解ボタンのアクション
+        async function handleResponse(isCorrect) {
+            if (cards.length === 0 || isSubmitting) return;
+            isSubmitting = true;
+
+            const currentCard = cards[currentIndex];
+            const apiUrl = localStorage.getItem('flashcard_api_url');
+
+            // 1. ローカル側の仮表示を瞬時に更新（サクサク感を演出）
+            if (isCorrect) {
+                currentCard.Correct_Count = (Number(currentCard.Correct_Count) || 0) + 1;
+            }
+            currentCard.Last_Date = new Date().toISOString();
+
+            // 同期中インジケーターを表示
+            const syncStatusBadge = document.getElementById('syncStatusBadge');
+            if (syncStatusBadge) {
+                syncStatusBadge.classList.remove('hidden');
+            }
+
+            // 2. 次のカードに進む（裏返っていたら戻す）
+resetCardState();
+
+// 最後のカードを学習し終えたかどうかの判定
+const isRoundFinished = (currentIndex + 1) >= cards.length;
+
+setTimeout(() => {
+    if (isRoundFinished) {
+        showRoundComplete(); // 一巡完了画面を表示
+        currentIndex = 0;   // 内部データは1枚目に戻しておく
+    } else {
+        currentIndex = (currentIndex + 1) % cards.length;
+    }
+    displayCard();
+    isSubmitting = false;
+}, 300); // めくりアニメーションを待つインターバル
+
+            // 3. GASバックエンドへ非同期送信（送信完了を待たずにUIを進めるので爆速）
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain', // CORSプレフライトを完全に回避し、スプレッドシートへの同期を確実に成功させる
+                    },
+                    body: JSON.stringify({
+                        sheetName: currentCategory,
+                        rowIndex: currentCard.rowIndex,
+                        isCorrect: isCorrect
+                    })
+                });
+
+                // 同期が完了したらバッジを隠す
+                setTimeout(() => {
+                    if (syncStatusBadge) {
+                        syncStatusBadge.classList.add('hidden');
+                    }
+                }, 500);
+
+            } catch (error) {
+                console.error('GAS同期エラー:', error);
+                if (syncStatusBadge) {
+                    syncStatusBadge.classList.add('hidden');
+                }
+            }
+        }
+    </script>
+            <!-- 一巡完了モーダル (ROUND COMPLETE MODAL) -->
+<div id="roundCompleteModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col gap-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-brand text-3xl mx-auto shadow-lg shadow-brand/10 animate-bounce">
+            <i class="fa-solid fa-trophy"></i>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold text-slate-100 tracking-tight">1周完了！お疲れ様でした 🎉</h3>
+            <p class="text-xs text-slate-400 mt-2">スプレッドシート内のすべてのカードを学習しました。</p>
+        </div>
+
+        <!-- 今回の学習セッション統計 -->
+        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm">
+            <div class="text-center">
+                <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">総カード数</span>
+                <span id="completedTotalCount" class="text-lg font-bold text-slate-200">-</span>
+            </div>
+            <div class="text-center border-l border-slate-800">
+                <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">学習モード</span>
+                <span id="completedModeName" class="text-xs font-bold text-brand mt-1 block">-</span>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-400 leading-relaxed">
+            もう一度繰り返してさらに記憶を定着させるか、他のカテゴリや学習モードに挑戦してみましょう。
+        </p>
+
+        <div class="flex flex-col gap-2">
+            <button onclick="restartRound()" class="w-full bg-brand hover:bg-brand-light text-slate-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand/10">
+                もう1周する
+            </button>
+            <button onclick="toggleRoundCompleteModal(false)" class="w-full bg-slate-800 text-slate-300 font-semibold py-3 rounded-xl hover:bg-slate-700 transition-colors">
+                閉じる
+            </button>
+        </div>
+    </div>
+</div>
+    
+    
+</body>
+</html>
