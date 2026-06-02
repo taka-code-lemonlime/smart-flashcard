@@ -70,8 +70,8 @@
             <div class="flex items-center gap-3">
                 <!-- カテゴリ選択とモード選択を並べる -->
                 <div class="flex gap-2">
-<select id="categorySelect" onchange="changeCategory(this.value)" class="flex-1 bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-2 focus:outline-none focus:border-brand">
-</select>
+                    <select id="categorySelect" onchange="changeCategory(this.value)" class="bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-2 focus:outline-none focus:border-brand">
+                    </select>
                     <select id="modeSelect" onchange="changeMode(this.value)" class="flex-1 bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-2 focus:outline-none focus:border-brand">
                         <option value="normal">📋 登録順</option>
                         <option value="weak">🔺 苦手優先</option>
@@ -165,18 +165,24 @@
 
     </main>
 
-    <!-- FOOTER ACTION BUTTONS -->
+    <!-- FOOTER ACTION BUTTONS: 押しやすさを考慮した3分割ボタンレイアウト -->
     <footer class="bg-slate-900/50 border-t border-slate-800/80 px-4 py-6 z-10">
-        <div class="max-w-md mx-auto flex gap-4">
-            <!-- 不正解ボタン -->
-            <button onclick="handleResponse(false)" class="flex-1 bg-red-950/40 hover:bg-red-950/60 active:scale-95 text-red-400 border border-red-900/50 py-4 px-6 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-950/20">
-                <i class="fa-solid fa-xmark text-lg"></i>
+        <div class="max-w-md mx-auto flex gap-2">
+            <!-- 不正解ボタン (Miss) -->
+            <button onclick="handleResponse('wrong')" class="flex-1 bg-red-950/40 hover:bg-red-950/60 active:scale-95 text-red-400 border border-red-900/50 py-4 px-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1 shadow-lg shadow-red-950/20">
+                <i class="fa-solid fa-xmark text-base"></i>
                 <span>違った</span>
             </button>
             
-            <!-- 正解ボタン -->
-            <button onclick="handleResponse(true)" class="flex-1 bg-brand hover:bg-brand-light active:scale-95 text-slate-950 py-4 px-6 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/10">
-                <i class="fa-solid fa-check text-lg"></i>
+            <!-- パスボタン (Pass): スレートカラーでニュートラルに配置 -->
+            <button onclick="handleResponse('pass')" class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 py-4 px-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1 shadow-lg shadow-slate-950/20">
+                <i class="fa-solid fa-forward text-base"></i>
+                <span>パス</span>
+            </button>
+            
+            <!-- 正解ボタン (Got it) -->
+            <button onclick="handleResponse('correct')" class="flex-1 bg-brand hover:bg-brand-light active:scale-95 text-slate-950 py-4 px-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1 shadow-lg shadow-brand/10">
+                <i class="fa-solid fa-check text-base"></i>
                 <span>覚えた！</span>
             </button>
         </div>
@@ -193,9 +199,6 @@
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
-            
-
-            
             
             <p class="text-xs text-slate-400 leading-relaxed">
                 GitHubにソースコードを置いてもURLが漏れないよう、あなたのiPhone本体のみにAPIの接続先を記憶させます。
@@ -221,14 +224,52 @@
         </div>
     </div>
 
+    <!-- 一巡完了モーダル (ROUND COMPLETE MODAL) -->
+    <div id="roundCompleteModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col gap-6 text-center">
+            <div class="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-brand text-3xl mx-auto shadow-lg shadow-brand/10 animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-slate-100 tracking-tight">1周完了！お疲れ様でした 🎉</h3>
+                <p class="text-xs text-slate-400 mt-2">スプレッドシート内のすべてのカードを学習しました。</p>
+            </div>
+
+            <!-- 今回の学習セッション統計 -->
+            <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm">
+                <div class="text-center">
+                    <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">総カード数</span>
+                    <span id="completedTotalCount" class="text-lg font-bold text-slate-200">-</span>
+                </div>
+                <div class="text-center border-l border-slate-800">
+                    <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">学習モード</span>
+                    <span id="completedModeName" class="text-xs font-bold text-brand mt-1 block">-</span>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-400 leading-relaxed">
+                もう一度繰り返してさらに記憶を定着させるか、他のカテゴリや学習モードに挑戦してみましょう。
+            </p>
+
+            <div class="flex flex-col gap-2">
+                <button onclick="restartRound()" class="w-full bg-brand hover:bg-brand-light text-slate-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand/10">
+                    もう1周する
+                </button>
+                <button onclick="toggleRoundCompleteModal(false)" class="w-full bg-slate-800 text-slate-300 font-semibold py-3 rounded-xl hover:bg-slate-700 transition-colors">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT LOGIC -->
     <script>
-let cards = [];
-let currentIndex = 0;
-let isFlipped = false;
-let currentCategory = ''; // 最初は空にする（自動ロードするため）
-let currentMode = 'normal'; // 初期出題モードを「登録順」に設定
-let isSubmitting = false;
+        let cards = [];
+        let currentIndex = 0;
+        let isFlipped = false;
+        let currentCategory = ''; // 最初は空にする（自動ロードするため）
+        let currentMode = 'normal'; // 初期出題モードを「登録順」に設定
+        let isSubmitting = false;
 
         // アプリ起動時の処理
         window.addEventListener('DOMContentLoaded', () => {
@@ -236,7 +277,7 @@ let isSubmitting = false;
             const savedUrl = localStorage.getItem('flashcard_api_url');
             if (savedUrl) {
                 document.getElementById('apiUrlInput').value = savedUrl;
-    loadSheetListAndCards(); // ★動的ロード用の関数を呼ぶ
+                loadSheetListAndCards(); // 動的ロード用の関数を呼ぶ
             } else {
                 // 設定がない場合は設定モーダルを強制表示
                 toggleSettingsModal(true);
@@ -284,7 +325,7 @@ let isSubmitting = false;
             }
             localStorage.setItem('flashcard_api_url', urlInput);
             toggleSettingsModal(false);
-            loadSheetListAndCards(); // ★動的ロード用の関数を呼ぶ
+            loadSheetListAndCards(); // 動的ロード用の関数を呼ぶ
         }
 
         // カテゴリの変更
@@ -294,7 +335,7 @@ let isSubmitting = false;
             loadCards();
         }
 
-// スプレッドシートからタブ（シート）一覧を動的に取得して組み立てる関数
+        // スプレッドシートからタブ（シート）一覧を動的に取得して組み立てる関数
         async function loadSheetListAndCards() {
             const apiUrl = localStorage.getItem('flashcard_api_url');
             if (!apiUrl) return;
@@ -365,7 +406,7 @@ let isSubmitting = false;
                 }
 
                 cards = data; // データをそのまま代入
-                applyModeAndSort(); // ★ソートと表示は専用関数に任せる
+                applyModeAndSort(); // ソートと表示は専用関数に任せる
 
             } catch (error) {
                 document.getElementById('progressText').innerText = "同期に失敗しました。URLを確認してください。";
@@ -472,50 +513,51 @@ let isSubmitting = false;
             }
         }
 
+        // カードの状態を表面に戻す
         function resetCardState() {
             isFlipped = false;
             document.getElementById('flashcard').classList.remove('rotate-y-180');
         }
 
         // 一巡完了モーダルの表示・非表示コントロール
-function toggleRoundCompleteModal(show) {
-    const modal = document.getElementById('roundCompleteModal');
-    if (modal) {
-        if (show) {
-            modal.classList.remove('hidden');
-        } else {
-            modal.classList.add('hidden');
+        function toggleRoundCompleteModal(show) {
+            const modal = document.getElementById('roundCompleteModal');
+            if (modal) {
+                if (show) {
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
         }
-    }
-}
 
-// 1周完了時の集計データの表示
-function showRoundComplete() {
-    document.getElementById('completedTotalCount').innerText = `${cards.length} 枚`;
+        // 1周完了時の集計データの表示
+        function showRoundComplete() {
+            document.getElementById('completedTotalCount').innerText = `${cards.length} 枚`;
 
-    const modeLabels = {
-        'weak': '🔺 苦手優先',
-        'normal': '📋 登録順',
-        'random': '🔀 ランダム',
-        'forgotten': '⏳ 忘却順'
-    };
-    document.getElementById('completedModeName').innerText = modeLabels[currentMode];
+            const modeLabels = {
+                'weak': '🔺 苦手優先',
+                'normal': '📋 登録順',
+                'random': '🔀 ランダム',
+                'forgotten': '⏳ 忘却順'
+            };
+            document.getElementById('completedModeName').innerText = modeLabels[currentMode];
 
-    toggleRoundCompleteModal(true);
-}
+            toggleRoundCompleteModal(true);
+        }
 
-// もう一周するボタンが押されたときのリスタート処理
-function restartRound() {
-    toggleRoundCompleteModal(false);
-    // ランダムモードの場合は再度シャッフルした方が親切なのでソートを掛け直す
-    if (currentMode === 'random') {
-        applyModeAndSort();
-    } else {
-        currentIndex = 0;
-        resetCardState();
-        displayCard();
-    }
-}
+        // もう一周するボタンが押されたときのリスタート処理
+        function restartRound() {
+            toggleRoundCompleteModal(false);
+            // ランダムモードの場合は再度シャッフルした方が親切なのでソートを掛け直す
+            if (currentMode === 'random') {
+                applyModeAndSort();
+            } else {
+                currentIndex = 0;
+                resetCardState();
+                displayCard();
+            }
+        }
         
         // 日付の簡易フォーマット変換
         function formatDateString(dateStr) {
@@ -527,42 +569,49 @@ function restartRound() {
             }
         }
 
-        // 正解・不正解ボタンのアクション
-        async function handleResponse(isCorrect) {
+        // 判定ボタン（違った・パス・覚えた！）のアクション
+        async function handleResponse(action) {
             if (cards.length === 0 || isSubmitting) return;
             isSubmitting = true;
 
             const currentCard = cards[currentIndex];
             const apiUrl = localStorage.getItem('flashcard_api_url');
 
-            // 1. ローカル側の仮表示を瞬時に更新（サクサク感を演出）
-            if (isCorrect) {
+            // 1. ローカル側の仮データを更新（パス以外のときだけ実行）
+            if (action === 'correct') {
                 currentCard.Correct_Count = (Number(currentCard.Correct_Count) || 0) + 1;
+                currentCard.Last_Date = new Date().toISOString();
+            } else if (action === 'wrong') {
+                currentCard.Last_Date = new Date().toISOString();
             }
-            currentCard.Last_Date = new Date().toISOString();
 
-            // 同期中インジケーターを表示
+            // 同期中インジケーターを表示（パス以外のときだけ表示して通信へ）
             const syncStatusBadge = document.getElementById('syncStatusBadge');
-            if (syncStatusBadge) {
+            if (action !== 'pass' && syncStatusBadge) {
                 syncStatusBadge.classList.remove('hidden');
             }
 
             // 2. 次のカードに進む（裏返っていたら戻す）
-resetCardState();
+            resetCardState();
 
-// 最後のカードを学習し終えたかどうかの判定
-const isRoundFinished = (currentIndex + 1) >= cards.length;
+            // 最後のカードを学習し終えたかどうかの判定
+            const isRoundFinished = (currentIndex + 1) >= cards.length;
 
-setTimeout(() => {
-    if (isRoundFinished) {
-        showRoundComplete(); // 一巡完了画面を表示
-        currentIndex = 0;   // 内部データは1枚目に戻しておく
-    } else {
-        currentIndex = (currentIndex + 1) % cards.length;
-    }
-    displayCard();
-    isSubmitting = false;
-}, 300); // めくりアニメーションを待つインターバル
+            setTimeout(() => {
+                if (isRoundFinished) {
+                    showRoundComplete(); // 一巡完了画面を表示
+                    currentIndex = 0;   // 内部データは1枚目に戻しておく
+                } else {
+                    currentIndex = (currentIndex + 1) % cards.length;
+                }
+                displayCard();
+                isSubmitting = false;
+            }, 300); // めくりアニメーションを待つインターバル
+
+            // パス（'pass'）の場合は、スプレッドシートへの通信をスキップして即終了する（超軽量動作）
+            if (action === 'pass') {
+                return;
+            }
 
             // 3. GASバックエンドへ非同期送信（送信完了を待たずにUIを進めるので爆速）
             try {
@@ -574,7 +623,7 @@ setTimeout(() => {
                     body: JSON.stringify({
                         sheetName: currentCategory,
                         rowIndex: currentCard.rowIndex,
-                        isCorrect: isCorrect
+                        isCorrect: (action === 'correct')
                     })
                 });
 
@@ -593,44 +642,5 @@ setTimeout(() => {
             }
         }
     </script>
-            <!-- 一巡完了モーダル (ROUND COMPLETE MODAL) -->
-<div id="roundCompleteModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col gap-6 text-center">
-        <div class="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-brand text-3xl mx-auto shadow-lg shadow-brand/10 animate-bounce">
-            <i class="fa-solid fa-trophy"></i>
-        </div>
-        <div>
-            <h3 class="text-xl font-bold text-slate-100 tracking-tight">1周完了！お疲れ様でした 🎉</h3>
-            <p class="text-xs text-slate-400 mt-2">スプレッドシート内のすべてのカードを学習しました。</p>
-        </div>
-
-        <!-- 今回の学習セッション統計 -->
-        <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm">
-            <div class="text-center">
-                <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">総カード数</span>
-                <span id="completedTotalCount" class="text-lg font-bold text-slate-200">-</span>
-            </div>
-            <div class="text-center border-l border-slate-800">
-                <span class="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">学習モード</span>
-                <span id="completedModeName" class="text-xs font-bold text-brand mt-1 block">-</span>
-            </div>
-        </div>
-
-        <p class="text-xs text-slate-400 leading-relaxed">
-            もう一度繰り返してさらに記憶を定着させるか、他のカテゴリや学習モードに挑戦してみましょう。
-        </p>
-
-        <div class="flex flex-col gap-2">
-            <button onclick="restartRound()" class="w-full bg-brand hover:bg-brand-light text-slate-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand/10">
-                もう1周する
-            </button>
-            <button onclick="toggleRoundCompleteModal(false)" class="w-full bg-slate-800 text-slate-300 font-semibold py-3 rounded-xl hover:bg-slate-700 transition-colors">
-                閉じる
-            </button>
-        </div>
-    </div>
-</div>
-    
-    
 </body>
 </html>
